@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const dns = require('dns');
 const app = express();
+let mongoose;
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
