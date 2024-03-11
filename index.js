@@ -4,7 +4,23 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const dns = require('dns');
 const app = express();
-let mongoose;
+let mongoose = require("mongoose");
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  useFindAndModify: false
+});
+
+const urlSchema = new mongoose.Schema({
+  original: {
+    type: String,
+    required: true
+  },
+  short: Number
+});
+
+let ShortUrl = mongoose.model('ShortUrl', urlSchema);
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -16,12 +32,6 @@ app.use('/public', express.static(`${process.cwd()}/public`));
 
 app.get('/', function(req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
-});
-
-
-// Your first API endpoint
-app.get('/api/hello', function(req, res) {
-  res.json({ greeting: 'hello API' });
 });
 
 function isValidHttpUrl(str) {
@@ -37,22 +47,48 @@ function isValidHttpUrl(str) {
   return pattern.test(str);
 }
 
+let responseObj = {};
+
 app.route('/api/shorturl')
 .post((req, res) => {
   const inputUrl = req.body.url;
+  let entryCount = 1;
   const invalidUrl = {error: 'invalid url'};
-  const validUrl = {
-    original_url: inputUrl,
-    short_url: 1
-  };
+  let responseObj = {'original_url': inputUrl, 'short_url': entryCount};
+
   if (isValidHttpUrl(inputUrl)) {
-    dns.lookup(inputUrl.hostname, (err) => {
+    const url = new URL(inputUrl).hostname;
+    dns.lookup(url.hostname, (err) => {
       if (err) return res.json(invalidUrl);
-      return res.json(validUrl);
+      ShortUrl
+      .findOne({original: inputUrl})
+      .sort({short: -1})
+      .exec((err, result) => {
+        if (err) return res.json(invalidUrl);
+        if (result == undefined || result == null) {
+          ShortUrl.countDocuments({}, (err, count)=> {
+            entryCount = count + 1;
+            responseObj['short_url'] = entryCount;
+            if (!err) {
+              ShortUrl.create({
+                original: inputUrl,
+                short: entryCount
+              });
+              res.json(responseObj);
+            }
+          });
+        } else {
+          responseObj['original_url'] = result.original;
+          responseObj['short_url'] = result.short;
+          res.json(responseObj);
+        }
+      });
+      
     })
   } else {
     return res.json(invalidUrl);
   }
+
 });
 
 app.listen(port, function() {
