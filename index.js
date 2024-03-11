@@ -91,6 +91,18 @@ app.route('/api/shorturl')
 
 });
 
+app.get('/api/shorturl/:shorturl', (req, res) => {
+  ShortUrl.findOne({short: req.params.shorturl}, (err, result) => {
+    if (!err) {
+      res.json({
+        original: result.original,
+        short: result.short
+      })
+      
+    }
+  })
+})
+
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
 });
